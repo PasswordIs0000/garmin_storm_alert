@@ -5,7 +5,8 @@ The Garmin Instinct watch provides a storm alert feature that alerts you if the 
 Uses the historical weather data from Meteostat: https://meteostat.net/
 
 Meteostat weather data is based on the listed sources: https://meteostat.net/de/sources
-Namely:
+
+Meteostat sources:
 - Deutscher Wetterdienst - Open Data
 - Deutscher Wetterdienst - Climate Data Center
 - NOAA - National Weather Service
