@@ -1,12 +1,10 @@
 import urllib.request
 import gzip
 import numpy as np
+import argparse
 
 # base url to the meteostat hourly archive
 BASE_URL = "https://open.meteostat.net/hourly/"
-
-# station id that should be queried
-STATION_ID = "10929" # konstanz, germany
 
 # delta in pressure change over the last three hours (values taken from garmin instinct watch)
 PRESSURE_DELTAS = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.0, 6.0]
@@ -15,9 +13,15 @@ PRESSURE_DELTAS = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.0, 6.0]
 WIND_DELTAS = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
 
 def main():
+    # parse command line arguments
+    parser = argparse.ArgumentParser(description="Evaluate the storm alert feature of the Garmin Instinct watch.")
+    parser.add_argument("--forecast", type=int, default=1, required=False, help="Time horizon for weather forecasting in hours.")
+    parser.add_argument("--station", type=str, default="10929", required=False, help="Station ID for which to do the weather forecast.")
+    args = parser.parse_args()
+
     # download the historical data
     csv_data = list()
-    fname, _ = urllib.request.urlretrieve(BASE_URL+STATION_ID+".csv.gz")
+    fname, _ = urllib.request.urlretrieve(BASE_URL+args.station+".csv.gz")
     with gzip.open(fname) as fd:
         for line in fd:
             line = line.decode("ascii").rstrip("\n")
@@ -28,10 +32,10 @@ def main():
     # collect the data
     millibar_last_3h = list()
     wind_next_1h = list()
-    for i in range(3, len(csv_data) - 1):
+    for i in range(3, len(csv_data)-args.forecast):
         try:
             mbar = float(csv_data[i-3][12]) - float(csv_data[i][12]) # decrease if storm is approaching
-            wind = float(csv_data[i+1][8]) - float(csv_data[i][8]) # increase if storm is happening
+            wind = float(csv_data[i+args.forecast][8]) - float(csv_data[i][8]) # increase if storm is happening
             millibar_last_3h.append(mbar)
             wind_next_1h.append(wind)
         except:
