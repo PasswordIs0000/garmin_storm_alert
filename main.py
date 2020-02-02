@@ -12,6 +12,17 @@ PRESSURE_DELTAS = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.0, 6.0]
 # delta in average wind speeds from now to the next hour
 WIND_DELTAS = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
 
+def float2string(x):
+    return "%.1f" % (x)
+
+def safe_string2float(x):
+    res = -1.0
+    try:
+        res = float(x)
+    except:
+        pass
+    return res
+
 def main():
     # parse command line arguments
     parser = argparse.ArgumentParser(description="Evaluate the storm alert feature of the Garmin Instinct watch.")
@@ -28,34 +39,39 @@ def main():
             fields = line.split(",")
             if len(fields) == 14:
                 csv_data.append(fields)
+    assert len(csv_data) > 0
 
     # collect the data
-    millibar_last_3h = list()
-    wind_next_1h = list()
+    pressure_change_3h = list()
+    wind_forecast = list()
     for i in range(3, len(csv_data)-args.forecast):
+        delta_p = None
+        delta_w = None
         try:
-            mbar = float(csv_data[i-3][12]) - float(csv_data[i][12]) # decrease if storm is approaching
-            wind = float(csv_data[i+args.forecast][8]) - float(csv_data[i][8]) # increase if storm is happening
-            millibar_last_3h.append(mbar)
-            wind_next_1h.append(wind)
+            delta_p = float(csv_data[i-3][12]) - float(csv_data[i][12]) # decrease if storm is approaching
+            max_wind = max([safe_string2float(x[8]) for x in csv_data[i+1:i+args.forecast+1]])
+            if max_wind > 0.0:
+                delta_w = max_wind - float(csv_data[i][8]) # increase if storm is happening
         except:
             pass
+        if not delta_p is None and not delta_w is None:
+            pressure_change_3h.append(delta_p)
+            wind_forecast.append(delta_w)
+    assert len(pressure_change_3h) > 0 and len(pressure_change_3h) == len(wind_forecast)
 
     # convert to numpy
-    millibar_last_3h = np.asarray(millibar_last_3h, dtype=np.float32)
-    wind_next_1h = np.asarray(wind_next_1h, dtype=np.float32)
+    pressure_change_3h = np.asarray(pressure_change_3h, dtype=np.float32)
+    wind_forecast = np.asarray(wind_forecast, dtype=np.float32)
 
     # printout
-    def f2s(x):
-        return "%.1f" % (x)
-    print("Pressure delta in 3h:\t%s" % ("\t\t".join(f2s(x) for x in PRESSURE_DELTAS)))
+    print("Pressure delta in 3h:\t%s" % ("\t\t".join(float2string(x) for x in PRESSURE_DELTAS)))
     print("                     \t%s" % ("\t\t".join(["fp/fn"] * len(PRESSURE_DELTAS))))
 
     # test all wind speeds
     for delta_w in WIND_DELTAS:
         # convert to a machine learning problem
-        X = millibar_last_3h
-        Y = (wind_next_1h > delta_w).astype(dtype=np.int32)
+        X = pressure_change_3h
+        Y = (wind_forecast > delta_w).astype(dtype=np.int32)
 
         # store the error rates
         all_errors = list()
@@ -73,7 +89,7 @@ def main():
             fn_rate = (np.sum(false_negatives) / np.sum(1-Y_hat)) * 100.0
             
             # printout
-            all_errors.append("%s/%s" % (f2s(fp_rate),f2s(fn_rate)))
+            all_errors.append("%s/%s" % (float2string(fp_rate),float2string(fn_rate)))
         
         # printout
         print("Wind %.1f km/h delta:\t%s" % (delta_w,"\t".join(all_errors)))
